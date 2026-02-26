@@ -1,0 +1,231 @@
+# Makefile for cross-platform building of UDP File Transfer Server (Lab 2)
+
+# Variables
+BINARY_NAME_SERVER=server
+BINARY_NAME_CLIENT=client
+BUILD_DIR=bin
+PKG_NAME=NSSaDS-lab2
+
+# Version info
+VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
+GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+# Build flags
+LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
+
+# Go build flags
+BUILD_FLAGS=-v $(LDFLAGS)
+
+# Platforms
+PLATFORMS=linux/amd64 linux/arm64 windows/amd64 windows/arm64 darwin/amd64 darwin/arm64
+
+# Help target
+.PHONY: help
+help: ## Show this help message
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Targets:'
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+# Clean build directory
+.PHONY: clean
+clean: ## Clean build directory
+	@echo "Cleaning build directory..."
+	@rm -rf $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)
+
+# Install dependencies
+.PHONY: deps
+deps: ## Install dependencies
+	@echo "Installing dependencies..."
+	@go mod download
+	@go mod tidy
+
+# Build for current platform
+.PHONY: build
+build: clean deps ## Build for current platform
+	@echo "Building for current platform..."
+	@mkdir -p $(BUILD_DIR)
+	@go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_SERVER) ./cmd/server
+	@go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT) ./cmd/client
+	@echo "Build completed for current platform"
+
+# Build for all platforms
+.PHONY: build-all
+build-all: clean deps ## Build for all platforms
+	@echo "Building for all platforms..."
+	@mkdir -p $(BUILD_DIR)
+	@for platform in $(PLATFORMS); do \
+		os=$$(echo $$platform | cut -d'/' -f1); \
+		arch=$$(echo $$platform | cut -d'/' -f2); \
+		echo "Building for $$platform..."; \
+		GOOS=$$os GOARCH=$$arch go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_SERVER)-$$os-$$arch$$(if [ "$$os" = "windows" ]; then echo ".exe"; fi) ./cmd/server; \
+		GOOS=$$os GOARCH=$$arch go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-$$os-$$arch$$(if [ "$$os" = "windows" ]; then echo ".exe"; fi) ./cmd/client; \
+	done
+	@echo "Cross-platform build completed"
+
+# Build for Linux
+.PHONY: build-linux
+build-linux: clean deps ## Build for Linux (amd64)
+	@echo "Building for Linux amd64..."
+	@mkdir -p $(BUILD_DIR)
+	@GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_SERVER)-linux-amd64 ./cmd/server
+	@GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-linux-amd64 ./cmd/client
+	@echo "Linux build completed"
+
+# Build for Windows
+.PHONY: build-windows
+build-windows: clean deps ## Build for Windows (amd64)
+	@echo "Building for Windows amd64..."
+	@mkdir -p $(BUILD_DIR)
+	@GOOS=windows GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_SERVER)-windows-amd64.exe ./cmd/server
+	@GOOS=windows GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-windows-amd64.exe ./cmd/client
+	@echo "Windows build completed"
+
+# Build for macOS
+.PHONY: build-darwin
+build-darwin: clean deps ## Build for macOS (amd64)
+	@echo "Building for macOS amd64..."
+	@mkdir -p $(BUILD_DIR)
+	@GOOS=darwin GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_SERVER)-darwin-amd64 ./cmd/server
+	@GOOS=darwin GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-darwin-amd64 ./cmd/client
+	@echo "macOS build completed"
+
+# Build for ARM64
+.PHONY: build-arm64
+build-arm64: clean deps ## Build for ARM64 platforms
+	@echo "Building for ARM64 platforms..."
+	@mkdir -p $(BUILD_DIR)
+	@GOOS=linux GOARCH=arm64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_SERVER)-linux-arm64 ./cmd/server
+	@GOOS=linux GOARCH=arm64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-linux-arm64 ./cmd/client
+	@GOOS=darwin GOARCH=arm64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_SERVER)-darwin-arm64 ./cmd/server
+	@GOOS=darwin GOARCH=arm64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-darwin-arm64 ./cmd/client
+	@echo "ARM64 build completed"
+
+# Run tests
+.PHONY: test
+test: ## Run tests
+	@echo "Running tests..."
+	@go test -v ./...
+
+# Run tests with coverage
+.PHONY: test-coverage
+test-coverage: ## Run tests with coverage
+	@echo "Running tests with coverage..."
+	@go test -v -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Format code
+.PHONY: fmt
+fmt: ## Format code
+	@echo "Formatting code..."
+	@go fmt ./...
+
+# Lint code
+.PHONY: lint
+lint: ## Lint code
+	@echo "Linting code..."
+	@golangci-lint run
+
+# Security check
+.PHONY: security
+security: ## Run security check
+	@echo "Running security check..."
+	@gosec ./...
+
+# Create release package
+.PHONY: package
+package: build-all ## Create release packages
+	@echo "Creating release packages..."
+	@mkdir -p $(BUILD_DIR)/release
+	@for platform in $(PLATFORMS); do \
+		os=$$(echo $$platform | cut -d'/' -f1); \
+		arch=$$(echo $$platform | cut -d'/' -f2); \
+		mkdir -p $(BUILD_DIR)/release/$$os-$$arch; \
+		cp $(BUILD_DIR)/$(BINARY_NAME_SERVER)-$$os-$$arch$$(if [ "$$os" = "windows" ]; then echo ".exe"; fi) $(BUILD_DIR)/release/$$os-$$arch/; \
+		cp $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-$$os-$$arch$$(if [ "$$os" = "windows" ]; then echo ".exe"; fi) $(BUILD_DIR)/release/$$os-$$arch/; \
+		cp README.md $(BUILD_DIR)/release/$$os-$$arch/ 2>/dev/null || true; \
+		if [ -d "uploads" ]; then cp -r uploads $(BUILD_DIR)/release/$$os-$$arch/; fi; \
+		cd $(BUILD_DIR)/release && tar -czf $(PKG_NAME)-$$os-$$arch.tar.gz $$os-$$arch/; \
+	done
+	@echo "Release packages created in $(BUILD_DIR)/release/"
+
+# Development server
+.PHONY: run-server
+run-server: ## Run server in development mode
+	@echo "Starting UDP server in development mode..."
+	@go run ./cmd/server
+
+# Development client
+.PHONY: run-client
+run-client: ## Run client in development mode
+	@echo "Starting UDP client in development mode..."
+	@go run ./cmd/client
+
+# Performance tests
+.PHONY: test-performance
+test-performance: ## Run performance tests
+	@echo "Running UDP performance tests..."
+	@go run ./cmd/server -test &
+	@sleep 2
+	@go run ./cmd/client -test
+	@sleep 5
+	@pkill -f "go run" || true
+
+# Network simulation tests
+.PHONY: test-network
+test-network: ## Test with network simulation (DROP/REJECT)
+	@echo "Testing network resilience..."
+	@echo "Note: This requires root privileges for firewall rules"
+	@echo "Testing with DROP rule (simulates packet loss)..."
+	@echo "sudo iptables -A OUTPUT -p udp --dport 8080 -j DROP"
+	@echo "Testing with REJECT rule (simulates connection refusal)..."
+	@echo "sudo iptables -A OUTPUT -p udp --dport 8080 -j REJECT"
+	@echo "Remember to flush rules after testing:"
+	@echo "sudo iptables -F"
+
+# Docker build
+.PHONY: docker-build
+docker-build: ## Build Docker image
+	@echo "Building Docker image..."
+	@docker build -t $(PKG_NAME):latest .
+
+# Docker run server
+.PHONY: docker-run-server
+docker-run-server: ## Run server in Docker
+	@echo "Running server in Docker..."
+	@docker run -p 8080:8080/udp -v $(PWD)/uploads:/app/uploads $(PKG_NAME):latest
+
+# Show build info
+.PHONY: info
+info: ## Show build information
+	@echo "Build Information:"
+	@echo "  Version: $(VERSION)"
+	@echo "  Build Time: $(BUILD_TIME)"
+	@echo "  Git Commit: $(GIT_COMMIT)"
+	@echo "  Go Version: $(shell go version)"
+	@echo "  Go OS/Arch: $(shell go env GOOS)/$(shell go env GOARCH)"
+
+# Benchmark UDP vs TCP
+.PHONY: benchmark
+benchmark: ## Benchmark UDP vs TCP performance
+	@echo "Running UDP vs TCP benchmark..."
+	@echo "Building both implementations..."
+	@$(MAKE) -C ../lab1 build
+	@$(MAKE) build
+	@echo "Running TCP baseline test..."
+	@cd ../lab1 && timeout 30s ./bin/server &
+	@sleep 2
+	@cd ../lab1 && timeout 30s ./bin/client -test || true
+	@pkill -f "lab1" || true
+	@echo "Running UDP test..."
+	@timeout 30s ./bin/server -test &
+	@sleep 2
+	@timeout 30s ./bin/client -test || true
+	@pkill -f "lab2" || true
+	@echo "Benchmark completed"
+
+# Default target
+.DEFAULT_GOAL := help
