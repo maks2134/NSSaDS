@@ -81,7 +81,6 @@ func (c *UDPClient) SendCommand(cmd string, args []string) (string, error) {
 		return "", fmt.Errorf("failed to send command: %w", err)
 	}
 
-	// Wait for response
 	ctx, cancel := context.WithTimeout(context.Background(), c.config.Timeout)
 	defer cancel()
 
@@ -117,7 +116,6 @@ func (c *UDPClient) UploadFile(localPath, remoteName string) (*domain.TransferPr
 
 	c.perfMonitor.StartTransfer(localPath, fileInfo.Size())
 
-	// Send upload command
 	cmd := fmt.Sprintf("UPLOAD %s", remoteName)
 	response, err := c.SendCommand(cmd, []string{})
 	if err != nil {
@@ -136,7 +134,6 @@ func (c *UDPClient) DownloadFile(remoteName, localPath string) (*domain.Transfer
 		return nil, fmt.Errorf("not connected to server")
 	}
 
-	// Send download command
 	cmd := fmt.Sprintf("DOWNLOAD %s", remoteName)
 	response, err := c.SendCommand(cmd, []string{})
 	if err != nil {
@@ -147,7 +144,6 @@ func (c *UDPClient) DownloadFile(remoteName, localPath string) (*domain.Transfer
 		return nil, fmt.Errorf("server error: %s", response)
 	}
 
-	// Parse file info from response
 	parts := strings.Fields(response)
 	if len(parts) < 3 {
 		return nil, fmt.Errorf("invalid file info response: %s", response)
@@ -184,10 +180,8 @@ func (c *UDPClient) sendFile(localPath string, fileSize int64) (*domain.Transfer
 			break
 		}
 
-		// Create data packet
 		packet := domain.NewPacket(domain.PacketTypeData, seqNum, buffer[:n])
 
-		// Send with reliability
 		if err := c.connMgr.SendReliablePacket(packet, c.serverAddr); err != nil {
 			return nil, fmt.Errorf("failed to send data packet: %w", err)
 		}
@@ -195,10 +189,8 @@ func (c *UDPClient) sendFile(localPath string, fileSize int64) (*domain.Transfer
 		totalBytes += int64(n)
 		seqNum++
 
-		// Update progress
 		c.perfMonitor.UpdateProgress(totalBytes)
 
-		// Simulate different buffer sizes for testing
 		c.testBufferSizes(totalBytes, fileSize)
 	}
 
@@ -234,11 +226,9 @@ func (c *UDPClient) receiveFile(localPath string, fileSize int64) (*domain.Trans
 			totalBytes += int64(len(packet.Data))
 			expectedSeq++
 
-			// Send ACK
 			ackPacket := domain.NewAckPacket(packet.SeqNum, expectedSeq, c.udpConfig.WindowSize)
 			c.relMgr.SendPacket(ackPacket, c.serverAddr)
 
-			// Update progress
 			c.perfMonitor.UpdateProgress(totalBytes)
 		}
 	}
@@ -248,12 +238,10 @@ func (c *UDPClient) receiveFile(localPath string, fileSize int64) (*domain.Trans
 }
 
 func (c *UDPClient) testBufferSizes(transferred, total int64) {
-	// Test different buffer sizes periodically
-	if transferred%int64(total/10) == 0 { // Test every 10% of progress
+	if transferred%int64(total/10) == 0 {
 		for _, bufferSize := range c.udpConfig.BufferSizes {
 			start := time.Now()
 
-			// Simulate sending with different buffer size
 			testData := make([]byte, bufferSize)
 			packet := domain.NewPacket(domain.PacketTypeData, 0, testData)
 
@@ -284,7 +272,6 @@ func (c *UDPClient) GetPerformanceReport() {
 
 	fmt.Printf("Average Bitrate: %.2f MB/s\n", avgBitrate)
 
-	// Compare with TCP (assuming TCP bitrate of 10 MB/s for comparison)
 	tcpBitrate := 10.0
 	ratio, isFaster := c.perfMonitor.CompareWithTCP(tcpBitrate)
 
@@ -295,7 +282,6 @@ func (c *UDPClient) GetPerformanceReport() {
 		fmt.Printf("UDP is %.2fx faster than TCP (does not meet 1.5x requirement)\n", ratio)
 	}
 
-	// Show optimal buffer size
 	optimalSize, optimalBitrate := c.perfMonitor.CalculateOptimalBufferSize()
 	fmt.Printf("Optimal Buffer Size: %d bytes (%.2f MB/s)\n", optimalSize, optimalBitrate)
 

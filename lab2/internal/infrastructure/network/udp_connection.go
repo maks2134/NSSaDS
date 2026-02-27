@@ -40,7 +40,6 @@ func NewUDPConnectionManager(conn *net.UDPConn, relMgr *ReliabilityManager, udpC
 }
 
 func (ucm *UDPConnectionManager) HandleConnection(ctx context.Context, conn *net.UDPConn, clientAddr *net.UDPAddr) error {
-	// This is handled by the UDP server's packet routing
 	return nil
 }
 
@@ -77,7 +76,6 @@ func (ucm *UDPConnectionManager) GetOrCreateClient(addr *net.UDPAddr) *ClientSes
 func (ucm *UDPConnectionManager) SendReliablePacket(packet *domain.Packet, addr *net.UDPAddr) error {
 	session := ucm.GetOrCreateClient(addr)
 
-	// Add to sliding window
 	if session.Window.CanSend() {
 		session.Window.AddPacket(packet)
 		return ucm.relMgr.SendPacket(packet, addr)

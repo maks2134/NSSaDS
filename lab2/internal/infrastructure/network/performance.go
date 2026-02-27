@@ -46,13 +46,11 @@ func (pm *PerformanceMonitor) UpdateProgress(transferred int64) {
 
 	pm.transferred = transferred
 
-	// Calculate current bitrate
 	elapsed := time.Since(pm.startTime).Seconds()
 	if elapsed > 0 {
-		currentBitrate := float64(transferred) / elapsed / 1024 / 1024 // MB/s
+		currentBitrate := float64(transferred) / elapsed / 1024 / 1024
 		pm.bitrates = append(pm.bitrates, currentBitrate)
 
-		// Keep only last 100 measurements
 		if len(pm.bitrates) > 100 {
 			pm.bitrates = pm.bitrates[1:]
 		}
@@ -72,7 +70,7 @@ func (pm *PerformanceMonitor) GetProgress() *domain.TransferProgress {
 	}
 
 	if elapsed > 0 {
-		bitrate = float64(pm.transferred) / elapsed / 1024 / 1024 // MB/s
+		bitrate = float64(pm.transferred) / elapsed / 1024 / 1024
 	}
 
 	return &domain.TransferProgress{
@@ -93,7 +91,7 @@ func (pm *PerformanceMonitor) CalculateOptimalBufferSize() (int, float64) {
 	defer pm.mu.RUnlock()
 
 	if len(pm.bufferTests) == 0 {
-		return 8192, 0.0 // Default buffer size
+		return 8192, 0.0
 	}
 
 	var bestSize int
@@ -117,7 +115,6 @@ func (pm *PerformanceMonitor) CompareWithTCP(tcpBitrate float64) (float64, bool)
 		return 0.0, false
 	}
 
-	// Calculate average UDP bitrate
 	var sum float64
 	for _, bitrate := range pm.bitrates {
 		sum += bitrate

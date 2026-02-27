@@ -107,7 +107,6 @@ func (p *Packet) Serialize() []byte {
 	binary.BigEndian.PutUint16(buf[20:22], uint16(len(p.Data)))
 	copy(buf[22:], p.Data)
 
-	// Calculate checksum
 	p.Checksum = p.calculateChecksum(buf)
 	binary.BigEndian.PutUint16(buf[21:23], p.Checksum)
 
@@ -137,7 +136,6 @@ func DeserializePacket(data []byte) (*Packet, error) {
 	p.Data = make([]byte, dataLen)
 	copy(p.Data, data[22:22+dataLen])
 
-	// Verify checksum
 	if !p.verifyChecksum(data) {
 		return nil, fmt.Errorf("checksum mismatch")
 	}
@@ -163,7 +161,6 @@ func (p *Packet) calculateChecksum(data []byte) uint16 {
 }
 
 func (p *Packet) verifyChecksum(data []byte) bool {
-	// Temporarily zero the checksum field
 	originalChecksum := p.Checksum
 	p.Checksum = 0
 	calculated := p.calculateChecksum(data)
@@ -192,7 +189,6 @@ func (sw *SlidingWindow) AddPacket(packet *Packet) {
 func (sw *SlidingWindow) AckPacket(seqNum uint32) {
 	sw.Acked[seqNum] = true
 
-	// Move window base forward
 	for sw.Acked[sw.BaseSeq] {
 		delete(sw.Buffer, sw.BaseSeq)
 		delete(sw.Acked, sw.BaseSeq)
@@ -217,7 +213,7 @@ func (sw *SlidingWindow) GetRetransmissionPackets(timeout time.Duration) []*Pack
 	for seqNum, packet := range sw.Buffer {
 		if !sw.Acked[seqNum] && now-packet.Timestamp > timeout.Nanoseconds() {
 			packets = append(packets, packet)
-			packet.Timestamp = now // Update timestamp for retransmission
+			packet.Timestamp = now
 		}
 	}
 

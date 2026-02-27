@@ -56,7 +56,6 @@ func (s *UDPServer) Start(ctx context.Context, addr string) error {
 
 	fmt.Printf("UDP Server started on %s\n", addr)
 
-	// Start cleanup goroutine
 	go s.cleanupRoutine(ctx)
 
 	for {
@@ -99,7 +98,6 @@ func (s *UDPServer) handlePacket(ctx context.Context, packet *domain.Packet, cli
 	case domain.PacketTypeData:
 		s.handleDataPacket(ctx, packet, clientAddr)
 	case domain.PacketTypeAck, domain.PacketTypeNack:
-		// Handled by reliability manager
 	case domain.PacketTypeSyn:
 		s.handleSynPacket(ctx, packet, clientAddr)
 	case domain.PacketTypeFin:
@@ -111,7 +109,6 @@ func (s *UDPServer) handleCommand(ctx context.Context, packet *domain.Packet, cl
 	cmd := string(packet.Data)
 	args := []string{}
 
-	// Parse command (simplified)
 	if len(cmd) > 0 {
 		parts := parseCommand(cmd)
 		if len(parts) > 0 {
@@ -139,14 +136,13 @@ func (s *UDPServer) handleDataPacket(ctx context.Context, packet *domain.Packet,
 	s.sessionsMu.RUnlock()
 
 	if !exists {
-		// Start new transfer session
 		session = &domain.TransferSession{
 			ID:          sessionID,
 			ClientAddr:  clientAddr.String(),
 			Transferred: 0,
 			LastUpdate:  time.Now(),
 			WindowSize:  s.udpConfig.WindowSize,
-			BufferSize:  s.udpConfig.BufferSizes[len(s.udpConfig.BufferSizes)/2], // Use middle buffer size
+			BufferSize:  s.udpConfig.BufferSizes[len(s.udpConfig.BufferSizes)/2],
 		}
 
 		s.sessionsMu.Lock()
@@ -154,7 +150,6 @@ func (s *UDPServer) handleDataPacket(ctx context.Context, packet *domain.Packet,
 		s.sessionsMu.Unlock()
 	}
 
-	// Save data
 	if err := s.fileMgr.SaveFile(session.FileName, packet.Data, int64(packet.SeqNum)); err != nil {
 		fmt.Printf("Failed to save data: %v\n", err)
 		return
@@ -163,24 +158,20 @@ func (s *UDPServer) handleDataPacket(ctx context.Context, packet *domain.Packet,
 	session.Transferred += int64(len(packet.Data))
 	session.LastUpdate = time.Now()
 
-	// Send ACK
 	ackPacket := domain.NewAckPacket(packet.SeqNum, packet.SeqNum+1, s.udpConfig.WindowSize)
 	if err := s.relMgr.SendPacket(ackPacket, clientAddr); err != nil {
 		fmt.Printf("Failed to send ACK: %v\n", err)
 	}
 
-	// Update progress
 	s.perfMonitor.UpdateProgress(session.Transferred)
 }
 
 func (s *UDPServer) handleSynPacket(ctx context.Context, packet *domain.Packet, clientAddr *net.UDPAddr) {
-	// Handle connection initiation
 	synAck := domain.NewPacket(domain.PacketTypeAck, packet.SeqNum+1, []byte("SYN-ACK"))
 	s.relMgr.SendPacket(synAck, clientAddr)
 }
 
 func (s *UDPServer) handleFinPacket(ctx context.Context, packet *domain.Packet, clientAddr *net.UDPAddr) {
-	// Handle connection termination
 	sessionID := fmt.Sprintf("%s_%d", clientAddr.String(), packet.SeqNum)
 
 	s.sessionsMu.Lock()
@@ -218,7 +209,6 @@ func (s *UDPServer) cleanupExpiredSessions() {
 }
 
 func parseCommand(cmd string) []string {
-	// Simple command parsing - split by spaces
 	parts := []string{}
 	current := ""
 

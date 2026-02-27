@@ -167,25 +167,21 @@ func runPerformanceTests(client *network.UDPClient, udpConfig *config.UDPConfig)
 	for _, bufferSize := range udpConfig.BufferSizes {
 		fmt.Printf("Testing buffer size: %d bytes\n", bufferSize)
 
-		// Create test file
 		testFile := fmt.Sprintf("test_%d.dat", bufferSize)
 		testData := make([]byte, bufferSize)
 		for i := range testData {
 			testData[i] = byte(i % 256)
 		}
 
-		// Write test file
 		if err := os.WriteFile(testFile, testData, 0644); err != nil {
 			fmt.Printf("Failed to create test file: %v\n", err)
 			continue
 		}
 
-		// Test upload
 		start := time.Now()
 		progress, err := client.UploadFile(testFile, fmt.Sprintf("upload_%d.dat", bufferSize))
 		elapsed := time.Since(start).Seconds()
 
-		// Clean up test file
 		os.Remove(testFile)
 
 		if err != nil {
@@ -201,10 +197,9 @@ func runPerformanceTests(client *network.UDPClient, udpConfig *config.UDPConfig)
 		})
 
 		fmt.Printf("  Buffer size %d: %.2f MB/s (%.2fs)\n", bufferSize, bitrate, elapsed)
-		time.Sleep(1 * time.Second) // Brief pause between tests
+		time.Sleep(1 * time.Second)
 	}
 
-	// Find optimal buffer size
 	var optimal TestResult
 	for _, result := range results {
 		if result.Bitrate > optimal.Bitrate {
@@ -214,8 +209,7 @@ func runPerformanceTests(client *network.UDPClient, udpConfig *config.UDPConfig)
 
 	fmt.Printf("\nOptimal buffer size: %d bytes (%.2f MB/s)\n", optimal.BufferSize, optimal.Bitrate)
 
-	// Compare with TCP (assuming TCP baseline)
-	tcpBaseline := 10.0 // MB/s
+	tcpBaseline := 10.0
 	ratio := optimal.Bitrate / tcpBaseline
 
 	fmt.Printf("UDP vs TCP Performance Ratio: %.2f\n", ratio)
@@ -225,7 +219,6 @@ func runPerformanceTests(client *network.UDPClient, udpConfig *config.UDPConfig)
 		fmt.Printf("✗ UDP is %.2fx faster than TCP (does not meet 1.5x requirement)\n", ratio)
 	}
 
-	// Explain buffer size optimization
 	fmt.Printf("\nBuffer Size Analysis:\n")
 	fmt.Printf("The optimal buffer size of %d bytes balances:\n", optimal.BufferSize)
 	fmt.Printf("- Network MTU considerations (reduces packet fragmentation)\n")

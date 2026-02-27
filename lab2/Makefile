@@ -1,26 +1,19 @@
-# Makefile for cross-platform building of UDP File Transfer Server (Lab 2)
 
-# Variables
 BINARY_NAME_SERVER=server
 BINARY_NAME_CLIENT=client
 BUILD_DIR=bin
 PKG_NAME=NSSaDS-lab2
 
-# Version info
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-# Build flags
 LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
 
-# Go build flags
 BUILD_FLAGS=-v $(LDFLAGS)
 
-# Platforms
 PLATFORMS=linux/amd64 linux/arm64 windows/amd64 windows/arm64 darwin/amd64 darwin/arm64
 
-# Help target
 .PHONY: help
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -28,21 +21,18 @@ help: ## Show this help message
 	@echo 'Targets:'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# Clean build directory
 .PHONY: clean
 clean: ## Clean build directory
 	@echo "Cleaning build directory..."
 	@rm -rf $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)
 
-# Install dependencies
 .PHONY: deps
 deps: ## Install dependencies
 	@echo "Installing dependencies..."
 	@go mod download
 	@go mod tidy
 
-# Build for current platform
 .PHONY: build
 build: clean deps ## Build for current platform
 	@echo "Building for current platform..."
@@ -51,7 +41,6 @@ build: clean deps ## Build for current platform
 	@go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT) ./cmd/client
 	@echo "Build completed for current platform"
 
-# Build for all platforms
 .PHONY: build-all
 build-all: clean deps ## Build for all platforms
 	@echo "Building for all platforms..."
@@ -65,7 +54,6 @@ build-all: clean deps ## Build for all platforms
 	done
 	@echo "Cross-platform build completed"
 
-# Build for Linux
 .PHONY: build-linux
 build-linux: clean deps ## Build for Linux (amd64)
 	@echo "Building for Linux amd64..."
@@ -74,7 +62,6 @@ build-linux: clean deps ## Build for Linux (amd64)
 	@GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-linux-amd64 ./cmd/client
 	@echo "Linux build completed"
 
-# Build for Windows
 .PHONY: build-windows
 build-windows: clean deps ## Build for Windows (amd64)
 	@echo "Building for Windows amd64..."
@@ -83,7 +70,6 @@ build-windows: clean deps ## Build for Windows (amd64)
 	@GOOS=windows GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-windows-amd64.exe ./cmd/client
 	@echo "Windows build completed"
 
-# Build for macOS
 .PHONY: build-darwin
 build-darwin: clean deps ## Build for macOS (amd64)
 	@echo "Building for macOS amd64..."
@@ -92,7 +78,6 @@ build-darwin: clean deps ## Build for macOS (amd64)
 	@GOOS=darwin GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-darwin-amd64 ./cmd/client
 	@echo "macOS build completed"
 
-# Build for ARM64
 .PHONY: build-arm64
 build-arm64: clean deps ## Build for ARM64 platforms
 	@echo "Building for ARM64 platforms..."
@@ -103,13 +88,11 @@ build-arm64: clean deps ## Build for ARM64 platforms
 	@GOOS=darwin GOARCH=arm64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME_CLIENT)-darwin-arm64 ./cmd/client
 	@echo "ARM64 build completed"
 
-# Run tests
 .PHONY: test
 test: ## Run tests
 	@echo "Running tests..."
 	@go test -v ./...
 
-# Run tests with coverage
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage
 	@echo "Running tests with coverage..."
@@ -117,25 +100,21 @@ test-coverage: ## Run tests with coverage
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
-# Format code
 .PHONY: fmt
 fmt: ## Format code
 	@echo "Formatting code..."
 	@go fmt ./...
 
-# Lint code
 .PHONY: lint
 lint: ## Lint code
 	@echo "Linting code..."
 	@golangci-lint run
 
-# Security check
 .PHONY: security
 security: ## Run security check
 	@echo "Running security check..."
 	@gosec ./...
 
-# Create release package
 .PHONY: package
 package: build-all ## Create release packages
 	@echo "Creating release packages..."
@@ -152,19 +131,16 @@ package: build-all ## Create release packages
 	done
 	@echo "Release packages created in $(BUILD_DIR)/release/"
 
-# Development server
 .PHONY: run-server
 run-server: ## Run server in development mode
 	@echo "Starting UDP server in development mode..."
 	@go run ./cmd/server
 
-# Development client
 .PHONY: run-client
 run-client: ## Run client in development mode
 	@echo "Starting UDP client in development mode..."
 	@go run ./cmd/client
 
-# Performance tests
 .PHONY: test-performance
 test-performance: ## Run performance tests
 	@echo "Running UDP performance tests..."
@@ -174,7 +150,6 @@ test-performance: ## Run performance tests
 	@sleep 5
 	@pkill -f "go run" || true
 
-# Network simulation tests
 .PHONY: test-network
 test-network: ## Test with network simulation (DROP/REJECT)
 	@echo "Testing network resilience..."
@@ -186,19 +161,16 @@ test-network: ## Test with network simulation (DROP/REJECT)
 	@echo "Remember to flush rules after testing:"
 	@echo "sudo iptables -F"
 
-# Docker build
 .PHONY: docker-build
 docker-build: ## Build Docker image
 	@echo "Building Docker image..."
 	@docker build -t $(PKG_NAME):latest .
 
-# Docker run server
 .PHONY: docker-run-server
 docker-run-server: ## Run server in Docker
 	@echo "Running server in Docker..."
 	@docker run -p 8080:8080/udp -v $(PWD)/uploads:/app/uploads $(PKG_NAME):latest
 
-# Show build info
 .PHONY: info
 info: ## Show build information
 	@echo "Build Information:"
@@ -208,7 +180,6 @@ info: ## Show build information
 	@echo "  Go Version: $(shell go version)"
 	@echo "  Go OS/Arch: $(shell go env GOOS)/$(shell go env GOARCH)"
 
-# Benchmark UDP vs TCP
 .PHONY: benchmark
 benchmark: ## Benchmark UDP vs TCP performance
 	@echo "Running UDP vs TCP benchmark..."
@@ -227,5 +198,4 @@ benchmark: ## Benchmark UDP vs TCP performance
 	@pkill -f "lab2" || true
 	@echo "Benchmark completed"
 
-# Default target
 .DEFAULT_GOAL := help

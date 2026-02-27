@@ -33,7 +33,6 @@ func NewReliabilityManager(conn *net.UDPConn, packetTimeout, retransmissionTimeo
 		stopChan:              make(chan struct{}),
 	}
 
-	// Start retransmission goroutine
 	rm.wg.Add(1)
 	go rm.retransmissionLoop()
 
@@ -67,7 +66,6 @@ func (rm *ReliabilityManager) ReceivePacket() (*domain.Packet, *net.UDPAddr, err
 		return nil, nil, fmt.Errorf("failed to deserialize packet: %w", err)
 	}
 
-	// Handle ACK packets
 	if packet.Type == domain.PacketTypeAck {
 		rm.pendingMutex.Lock()
 		delete(rm.pendingPackets, packet.AckNum)
@@ -114,7 +112,6 @@ func (rm *ReliabilityManager) checkRetransmissions() {
 		elapsed := time.Duration(now - packet.Timestamp)
 
 		if elapsed > rm.retransmissionTimeout {
-			// Check retransmission limit
 			retransmitCount := rm.getRetransmitCount(packet)
 			if retransmitCount >= rm.maxRetransmissions {
 				delete(rm.pendingPackets, seqNum)
@@ -122,21 +119,18 @@ func (rm *ReliabilityManager) checkRetransmissions() {
 				continue
 			}
 
-			// Retransmit packet
 			data := packet.Serialize()
 			if _, err := rm.conn.WriteToUDP(data, nil); err != nil {
 				fmt.Printf("Retransmission failed: %v\n", err)
 			} else {
 				rm.retransmits++
-				packet.Timestamp = now // Update timestamp
+				packet.Timestamp = now
 			}
 		}
 	}
 }
 
 func (rm *ReliabilityManager) getRetransmitCount(packet *domain.Packet) int {
-	// This is a simplified implementation
-	// In a real implementation, you'd track retransmission count per packet
 	return 0
 }
 
@@ -145,13 +139,10 @@ func (rm *ReliabilityManager) Stop() {
 	rm.wg.Wait()
 }
 
-// Simulate packet loss for testing
 func (rm *ReliabilityManager) SimulatePacketLoss(lossRate float64) {
 	rand.Seed(time.Now().UnixNano())
 
-	// This would be integrated into SendPacket for testing
 	if rand.Float64() < lossRate {
-		// Simulate dropping the packet
 		rm.packetsLost++
 	}
 }

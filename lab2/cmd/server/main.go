@@ -80,16 +80,13 @@ func main() {
 func runPerformanceTests(server *network.UDPServer, udpConfig *config.UDPConfig) {
 	fmt.Println("Running UDP performance tests...")
 
-	// Test different buffer sizes
 	fmt.Printf("Testing buffer sizes: %v\n", udpConfig.BufferSizes)
 
 	for _, bufferSize := range udpConfig.BufferSizes {
 		fmt.Printf("Testing buffer size: %d bytes\n", bufferSize)
 
-		// Simulate performance test
 		start := time.Now()
 
-		// This would involve actual network testing
 		elapsed := time.Since(start).Seconds()
 		if elapsed > 0 {
 			bitrate := float64(bufferSize) / elapsed / 1024 / 1024
