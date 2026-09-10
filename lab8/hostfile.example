@@ -1,0 +1,9 @@
+# Example hostfile for mpirun across 3 machines.
+# Replace hostnames/IPs with real lab hosts; slots = MPI processes per host.
+#
+# Usage:
+#   mpirun -np 6 --hostfile hostfile ./bin/lab8 -mode compare -groups 2 -n 2560
+#
+node1 slots=2
+node2 slots=2
+node3 slots=2
