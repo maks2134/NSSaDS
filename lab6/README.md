@@ -43,11 +43,16 @@ me (alice): hello bob
 alice (192.168.1.10): hello bob
 ```
 
-Если интерфейс определился неверно (VPN и т.п.):
+Если интерфейс определился неверно (VPN / Hyper-V / Docker):
 
 ```bash
-./bin/lab6 -nick alice -iface en0
+./bin/lab6 -list                          # список интерфейсов
+./bin/lab6 -nick alice -iface en0         # macOS
+lab6-windows-amd64.exe -nick bob -iface "Wi-Fi"
 ```
+
+Важно: оба ПК должны быть в **одной подсети** (например оба `192.168.0.x`).
+Интерфейс `vEthernet (Default Switch)` — это Hyper-V, не Wi‑Fi; через него чат с Mac не заработает.
 
 ## Запуск
 

@@ -57,6 +57,10 @@ func PrintHelp(out io.Writer) {
 func PrintStartup(out io.Writer, cfg *config.Config, info domain.IfaceInfo, mode domain.Mode) {
 	fmt.Fprintf(out, "lab6 chat started on port %d as %q\n", cfg.Port, cfg.Nick)
 	PrintNet(out, info, mode, cfg.Group)
+	if netiface.IsVirtualName(info.Name) {
+		fmt.Fprintln(out, "warning: virtual interface selected; peers on LAN may not see you")
+		fmt.Fprintln(out, `run with -list and -iface "Wi-Fi" (or Ethernet)`)
+	}
 	fmt.Fprintln(out, "type a message and press Enter to send to peers")
 	fmt.Fprintln(out, "commands: /peers  /mode multicast  /leave  /ignore <ip>  /help  /quit")
 }
