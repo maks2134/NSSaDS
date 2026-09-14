@@ -7,8 +7,8 @@ import (
 
 type Socket interface {
 	Send(dst net.IP, payload []byte) error
-	Peek(buf []byte) (n int, from net.IP, err error)
-	Recv(buf []byte) (n int, from net.IP, err error)
+	Peek(buf []byte) (n int, from net.IP, ttl int, err error)
+	Recv(buf []byte) (n int, from net.IP, ttl int, err error)
 	SetTTL(ttl int) error
 	SetReadTimeout(d time.Duration) error
 	Close() error

@@ -3,6 +3,7 @@ package icmp
 import (
 	"context"
 	"errors"
+	"net"
 	"runtime"
 	"sync"
 	"time"
@@ -14,33 +15,28 @@ import (
 type Claimer struct {
 	mu      sync.Mutex
 	sock    domain.Socket
-	workers map[int]struct{}
+	workers map[int]net.IP
 	buf     []byte
 }
 
 func NewClaimer(sock domain.Socket) *Claimer {
 	return &Claimer{
 		sock:    sock,
-		workers: make(map[int]struct{}),
+		workers: make(map[int]net.IP),
 		buf:     make([]byte, config.ReadBufferSize),
 	}
 }
 
-func (c *Claimer) Register(id int) {
+func (c *Claimer) Register(id int, target net.IP) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.workers[id] = struct{}{}
+	c.workers[id] = cloneIP(target)
 }
 
 func (c *Claimer) Unregister(id int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.workers, id)
-}
-
-func (c *Claimer) isRegistered(id int) bool {
-	_, ok := c.workers[id]
-	return ok
 }
 
 func (c *Claimer) SendProbe(p domain.Probe, payload []byte) error {
@@ -58,7 +54,7 @@ func (c *Claimer) PeekAndClaim(id, seq int) (*domain.Packet, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	n, from, err := c.sock.Peek(c.buf)
+	n, from, ttl, err := c.sock.Peek(c.buf)
 	if err != nil {
 		return nil, err
 	}
@@ -67,31 +63,59 @@ func (c *Claimer) PeekAndClaim(id, seq int) (*domain.Packet, error) {
 	if err != nil {
 		return nil, c.dropCurrent(err)
 	}
+	applyRecvTTL(pkt, ttl)
 	if !c.shouldKeep(pkt) {
 		return nil, c.dropCurrent(errDropped)
 	}
-	if !MatchesWorker(pkt, id, seq) {
+	if !c.matches(pkt, id, seq) {
 		return nil, ErrNotForWorker
 	}
 
-	n, from, err = c.sock.Recv(c.buf)
+	n, from, ttl, err = c.sock.Recv(c.buf)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePacket(c.buf[:n], from)
+	pkt, err = ParsePacket(c.buf[:n], from)
+	if err != nil {
+		return nil, err
+	}
+	applyRecvTTL(pkt, ttl)
+	return pkt, nil
+}
+
+func (c *Claimer) matches(pkt *domain.Packet, id, seq int) bool {
+	if MatchesWorker(pkt, id, seq) {
+		return true
+	}
+	return MatchesTarget(pkt, c.workers[id], seq)
 }
 
 func (c *Claimer) shouldKeep(pkt *domain.Packet) bool {
-	wid, ok := PacketWorkerID(pkt)
-	return ok && c.isRegistered(wid)
+	if wid, ok := PacketWorkerID(pkt); ok {
+		if _, registered := c.workers[wid]; registered {
+			return true
+		}
+	}
+	for _, ip := range c.workers {
+		if ipEqual(pkt.From, ip) || ipEqual(pkt.OrigDst, ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Claimer) dropCurrent(cause error) error {
-	_, _, recvErr := c.sock.Recv(c.buf)
+	_, _, _, recvErr := c.sock.Recv(c.buf)
 	if recvErr != nil {
 		return recvErr
 	}
 	return cause
+}
+
+func applyRecvTTL(pkt *domain.Packet, ttl int) {
+	if pkt != nil && pkt.TTL == 0 && ttl > 0 {
+		pkt.TTL = ttl
+	}
 }
 
 func (c *Claimer) Wait(

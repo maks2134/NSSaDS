@@ -93,6 +93,9 @@ func fillPacketBody(pkt *domain.Packet, msg *icmp.Message) error {
 }
 
 func fillInnerEcho(pkt *domain.Packet, data []byte) error {
+	if origDst := innerIPv4Dst(data); origDst != nil {
+		pkt.OrigDst = origDst
+	}
 	inner, _, _, err := extractICMP(data)
 	if err != nil {
 		return err
@@ -106,6 +109,13 @@ func fillInnerEcho(pkt *domain.Packet, data []byte) error {
 		pkt.Payload = inner[minICMPHeader:]
 	}
 	return nil
+}
+
+func innerIPv4Dst(data []byte) net.IP {
+	if len(data) < minIPv4Header || data[0]>>4 != 4 {
+		return nil
+	}
+	return net.IPv4(data[16], data[17], data[18], data[19])
 }
 
 func extractICMP(buf []byte) (body []byte, ttl int, src net.IP, err error) {

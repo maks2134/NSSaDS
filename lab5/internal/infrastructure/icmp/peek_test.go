@@ -17,23 +17,23 @@ type fakeSock struct {
 
 func (f *fakeSock) Send(net.IP, []byte) error { return nil }
 
-func (f *fakeSock) Peek(buf []byte) (int, net.IP, error) {
+func (f *fakeSock) Peek(buf []byte) (int, net.IP, int, error) {
 	if len(f.packets) == 0 {
-		return 0, nil, ErrTimeout
+		return 0, nil, 0, ErrTimeout
 	}
 	n := copy(buf, f.packets[0])
-	return n, f.from[0], nil
+	return n, f.from[0], 0, nil
 }
 
-func (f *fakeSock) Recv(buf []byte) (int, net.IP, error) {
+func (f *fakeSock) Recv(buf []byte) (int, net.IP, int, error) {
 	if len(f.packets) == 0 {
-		return 0, nil, ErrTimeout
+		return 0, nil, 0, ErrTimeout
 	}
 	n := copy(buf, f.packets[0])
 	from := f.from[0]
 	f.packets = f.packets[1:]
 	f.from = f.from[1:]
-	return n, from, nil
+	return n, from, 0, nil
 }
 
 func (f *fakeSock) SetTTL(int) error                   { return nil }
@@ -49,7 +49,7 @@ func TestPeekAndClaimTakesOwnPacket(t *testing.T) {
 		from:    []net.IP{src},
 	}
 	c := NewClaimer(sock)
-	c.Register(11)
+	c.Register(11, src)
 
 	pkt, err := c.PeekAndClaim(11, 1)
 	if err != nil {
@@ -72,8 +72,8 @@ func TestPeekAndClaimLeavesForeignPacket(t *testing.T) {
 		from:    []net.IP{src},
 	}
 	c := NewClaimer(sock)
-	c.Register(11)
-	c.Register(22)
+	c.Register(11, net.IPv4(8, 8, 8, 8))
+	c.Register(22, src)
 
 	_, err := c.PeekAndClaim(11, 1)
 	if err != ErrNotForWorker {
@@ -93,7 +93,7 @@ func TestPeekAndClaimDropsUnrelated(t *testing.T) {
 		from:    []net.IP{src},
 	}
 	c := NewClaimer(sock)
-	c.Register(11)
+	c.Register(11, net.IPv4(8, 8, 8, 8))
 
 	_, err := c.PeekAndClaim(11, 1)
 	if err != errDropped {
@@ -101,5 +101,25 @@ func TestPeekAndClaimDropsUnrelated(t *testing.T) {
 	}
 	if len(sock.packets) != 0 {
 		t.Fatal("unrelated packet must be dropped")
+	}
+}
+
+func TestPeekAndClaimMatchesRewrittenIDByTarget(t *testing.T) {
+	t.Parallel()
+	src := net.IPv4(8, 8, 8, 8)
+	body := mustEcho(t, ipv4.ICMPTypeEchoReply, 99, 1, BuildPayload(time.Now(), 8))
+	sock := &fakeSock{
+		packets: [][]byte{wrapIPv4(t, src, body, 64)},
+		from:    []net.IP{src},
+	}
+	c := NewClaimer(sock)
+	c.Register(11, src)
+
+	pkt, err := c.PeekAndClaim(11, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pkt.Kind != domain.KindEchoReply {
+		t.Fatalf("kind %v", pkt.Kind)
 	}
 }

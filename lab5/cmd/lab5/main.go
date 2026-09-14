@@ -41,7 +41,7 @@ func printUsage() {
 Usage:
   lab5 ping [-c N] [-W duration] [-i interval] [--trace] host [host...]
   lab5 traceroute [-m maxhops] [-W duration] host [host...]
-  lab5 smurf -victim IP -bcast IP [-c N]
+  lab5 smurf <victim-ip> [-c N] [-bcast IP]
 
 Raw ICMP sockets require root (Unix) or Administrator (Windows).
 Smurf is a lab demonstration: at most %d packets, own network only.

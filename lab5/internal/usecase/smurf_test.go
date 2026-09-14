@@ -119,3 +119,26 @@ func TestSendOneSpoofsSource(t *testing.T) {
 		t.Fatalf("protocol %d want icmp", pkt[9])
 	}
 }
+
+func TestBroadcastAddr(t *testing.T) {
+	t.Parallel()
+	got := BroadcastAddr(net.IPv4(192, 168, 1, 20), net.CIDRMask(24, 32))
+	want := net.IPv4(192, 168, 1, 255)
+	if !got.Equal(want) {
+		t.Fatalf("got %s want %s", got, want)
+	}
+}
+
+func TestSmurfDestsSkipsVictim(t *testing.T) {
+	t.Parallel()
+	victim := net.IPv4(10, 0, 0, 2)
+	local := net.IPv4(10, 0, 0, 1)
+	bcast := net.IPv4(10, 0, 0, 255)
+	got := smurfDests(victim, local, bcast)
+	if len(got) != 2 {
+		t.Fatalf("dests %v", got)
+	}
+	if !got[0].Equal(local) || !got[1].Equal(bcast) {
+		t.Fatalf("dests %v", got)
+	}
+}

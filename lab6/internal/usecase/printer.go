@@ -57,7 +57,8 @@ func PrintHelp(out io.Writer) {
 func PrintStartup(out io.Writer, cfg *config.Config, info domain.IfaceInfo, mode domain.Mode) {
 	fmt.Fprintf(out, "lab6 chat started on port %d as %q\n", cfg.Port, cfg.Nick)
 	PrintNet(out, info, mode, cfg.Group)
-	fmt.Fprintln(out, "type /help for commands")
+	fmt.Fprintln(out, "type a message and press Enter to send to peers")
+	fmt.Fprintln(out, "commands: /peers  /mode multicast  /leave  /ignore <ip>  /help  /quit")
 }
 
 func DetectIface(name string) (domain.IfaceInfo, error) {

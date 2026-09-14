@@ -39,20 +39,20 @@ func (s *Socket) Send(dst net.IP, payload []byte) error {
 	return nil
 }
 
-func (s *Socket) Peek(buf []byte) (int, net.IP, error) {
+func (s *Socket) Peek(buf []byte) (int, net.IP, int, error) {
 	return s.recv(buf, windows.MSG_PEEK)
 }
 
-func (s *Socket) Recv(buf []byte) (int, net.IP, error) {
+func (s *Socket) Recv(buf []byte) (int, net.IP, int, error) {
 	return s.recv(buf, 0)
 }
 
-func (s *Socket) recv(buf []byte, flags int) (int, net.IP, error) {
+func (s *Socket) recv(buf []byte, flags int) (int, net.IP, int, error) {
 	n, from, err := windows.Recvfrom(s.fd, buf, flags)
 	if err != nil {
-		return 0, nil, mapRecvError(err)
+		return 0, nil, 0, mapRecvError(err)
 	}
-	return n, ipFromSockaddr(from), nil
+	return n, ipFromSockaddr(from), 0, nil
 }
 
 func (s *Socket) SetTTL(ttl int) error {

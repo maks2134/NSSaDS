@@ -42,7 +42,7 @@ func (t *Tracer) Run(ctx context.Context, hosts []string) error {
 		go func(index int, tgt Target) {
 			defer wg.Done()
 			id := WorkerID(index)
-			claimer.Register(id)
+			claimer.Register(id, tgt.IP)
 			defer claimer.Unregister(id)
 			t.runHost(ctx, claimer, id, tgt)
 		}(i, tgt)

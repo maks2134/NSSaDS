@@ -35,6 +35,7 @@ type Packet struct {
 	Seq     int
 	OrigID  int
 	OrigSeq int
+	OrigDst net.IP
 	Code    int
 	Payload []byte
 	Size    int

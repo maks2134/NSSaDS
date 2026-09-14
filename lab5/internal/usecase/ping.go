@@ -57,7 +57,7 @@ func (p *Pinger) runHost(
 	tgt Target,
 ) {
 	id := WorkerID(index)
-	claimer.Register(id)
+	claimer.Register(id, tgt.IP)
 	defer claimer.Unregister(id)
 
 	if p.trace {

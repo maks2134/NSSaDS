@@ -97,3 +97,13 @@ func (r *PeerRegistry) List(mode Mode) []Peer {
 	}
 	return out
 }
+
+func (r *PeerRegistry) NickOf(ip net.IP) string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	p, ok := r.peers[ip.String()]
+	if !ok || p.Nick == "" {
+		return ""
+	}
+	return p.Nick
+}

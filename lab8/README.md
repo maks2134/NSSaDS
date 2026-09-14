@@ -18,67 +18,68 @@
   - Debian/Ubuntu: `sudo apt install libopenmpi-dev openmpi-bin`
 - Для сдачи: запуск на **2+ физических машинах** (`mpirun --hostfile …`), общий путь к `data/`
 
-## Сборка
+## Показ лабораторной (только `make`)
+
+Все сценарии сдачи завёрнуты в Makefile — флаги MPI/CLI передавать не нужно.
 
 ```bash
 cd lab8
-make deps
-make test
-make build        # текущая платформа, CGO + OpenMPI
-make build-all    # linux/darwin/windows amd64+arm64
+make help                 # список целей
+make demo-quick           # быстрый полный прогон (N=256): тесты + compare + nonblocking + файлы
+make demo                 # то же с дефолтами N=2560 NP=4 GROUPS=2
+make run                  # основной прогон: compare (коллективы vs P2P) + группы + MPI-IO
+make show                 # показать A.bin / B.bin / group-*.bin
 ```
 
-Бинарники:
-
-- `bin/lab8` — нативная сборка с MPI (`make build`)
-- `bin/lab8-<os>-<arch>[.exe]` — кросс-сборка (`make build-all`)
-
-Для сдачи на Linux-машинах собирайте **на каждой целевой ОС** с установленным OpenMPI (`make build`).
-
-## Запуск
-
-Локально (отладка):
+Отдельные режимы:
 
 ```bash
-make run-compare NP=4 GROUPS=2 N=512
-# или:
-mpirun -np 4 ./bin/lab8 -mode compare -groups 2 -seed 1 -n 512 -panel 64 -gen
+make run-collective
+make run-blocking
+make run-nonblocking
 ```
 
-На нескольких компьютерах:
-
-1. Скопируйте `bin/lab8` на все хосты (одинаковый путь).
-2. Положите `data/A.bin` и `data/B.bin` на **общий сетевой каталог** (или `-gen` с NFS `outdir`).
-3. Заполните `hostfile` по образцу [`hostfile.example`](hostfile.example).
-4. Запустите:
+Переопределять только то, что меняете:
 
 ```bash
-mpirun -np 6 --hostfile hostfile ./bin/lab8 \
-  -mode compare -groups 2 -seed 1 -n 2560 -panel 64 -gen \
-  -a /nfs/lab8/A.bin -b /nfs/lab8/B.bin -outdir /nfs/lab8
+make run NP=6 GROUPS=3 N=1024
+make demo-quick GROUPS=3
 ```
 
-### Параметры
+| Переменная | По умолчанию | Смысл |
+|------------|--------------|--------|
+| `NP` | 4 | число MPI-процессов |
+| `GROUPS` | 2 | число групп |
+| `N` | 2560 | размер матрицы |
+| `PANEL` | 64 | ширина панели B (P2P) |
+| `SEED` | 1 | seed разбиения на группы |
+| `HOSTFILE` | пусто | путь к hostfile для кластера |
 
-| Флаг | По умолчанию | Описание |
-|------|--------------|----------|
-| `-n` | 2560 | размер матрицы `N` |
-| `-panel` | 64 | ширина панели `B` для P2P-режимов |
-| `-mode` | `compare` | `blocking` \| `nonblocking` \| `collective` \| `compare` |
-| `-groups` | 2 | число групп |
-| `-seed` | 1 | seed для случайного разбиения |
-| `-a` / `-b` | `data/A.bin` / `data/B.bin` | входные матрицы |
-| `-outdir` | `data` | каталог для `group-*.bin` |
-| `-gen` | false | сгенерировать A/B на rank 0 перед запуском |
+### Кластер (2+ машины)
 
-Пример вывода (rank 0):
+1. `make build` на каждой машине (или общий бинарник).
+2. Скопируйте [`hostfile.example`](hostfile.example) → `hostfile`, пропишите хосты.
+3. Общий каталог `data/` (NFS) либо локальный `data/` с `-gen` на rank 0.
+
+```bash
+make run HOSTFILE=hostfile NP=6
+make demo HOSTFILE=hostfile NP=6 N=1024
+```
+
+### Сборка
+
+```bash
+make deps && make test && make build
+make build-all    # кросс linux/darwin/windows (реальный MPI только нативный Unix + CGO)
+```
+
+Пример вывода (`make run`):
 
 ```
 groups=2  N=512  panel=64  seed=1  mode=compare
 group=0  ranks=[0 2 3]  P=3  collective=0.412s  blocking=0.501s  checksum=1.234567e+06
 group=1  ranks=[1]  P=1  collective=1.103s  blocking=1.098s  checksum=1.234567e+06
 ```
-
 ## Алгоритм
 
 ### Группы
@@ -102,11 +103,18 @@ group=1  ranks=[1]  P=1  collective=1.103s  blocking=1.098s  checksum=1.234567e+
 
 ## Сценарий сдачи
 
-1. Собрать на всех машинах, общий NFS для `data/`.
-2. `mpirun --hostfile … -np ≥4 ./bin/lab8 -mode compare -groups 2 -gen -n …`
-3. Показать разные составы групп и файлы `group-0.bin`, `group-1.bin`.
-4. Сравнить `collective` vs `blocking` (и при желании `-mode nonblocking`).
-5. Убедиться, что `checksum` и `checksum_p2p` совпадают внутри группы.
+```bash
+make build
+make demo-quick                          # локально / репетиция
+make run HOSTFILE=hostfile NP=6          # на 2+ машинах
+make show                                # group-0.bin, group-1.bin, …
+```
+
+1. Собрать на всех машинах (`make build`), общий NFS для `data/` при необходимости.
+2. `make run` / `make demo` — compare: время collective vs blocking, разные `ranks=` у групп.
+3. `make show` — файлы результатов групп.
+4. При необходимости `make run-nonblocking` — асинхронный режим из л.р. №7.
+5. `checksum` и `checksum_p2p` внутри группы должны совпадать.
 
 ## Архитектура
 

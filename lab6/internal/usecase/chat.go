@@ -82,7 +82,14 @@ func (c *Chat) send(msgType domain.MsgType, payload []byte) error {
 func (c *Chat) HandleInput(line string) (done bool, err error) {
 	cmd, ok := ParseCommand(line)
 	if !ok {
-		return false, c.SendChat(line)
+		if line == "" {
+			return false, nil
+		}
+		if err := c.SendChat(line); err != nil {
+			return false, err
+		}
+		fmt.Fprintf(c.out, "me (%s): %s\n", c.nick, line)
+		return false, nil
 	}
 	switch cmd.Name {
 	case "/net":
@@ -219,11 +226,19 @@ func (c *Chat) HandlePacket(from net.IP, data []byte) error {
 	now := time.Now()
 	switch msg.Type {
 	case domain.MsgHello:
-		c.peers.Upsert(from, string(msg.Payload), msg.Mode, now)
+		nick := string(msg.Payload)
+		wasNew := c.peers.NickOf(from) == ""
+		c.peers.Upsert(from, nick, msg.Mode, now)
+		if wasNew {
+			fmt.Fprintf(c.out, "* %s (%s) online\n", nickOrIP(nick, from), from)
+		}
 	case domain.MsgBye:
+		nick := c.peers.NickOf(from)
 		c.peers.Remove(from)
+		fmt.Fprintf(c.out, "* %s (%s) left\n", nickOrIP(nick, from), from)
 	case domain.MsgChat:
-		fmt.Fprintf(c.out, "[%s] %s\n", from, string(msg.Payload))
+		nick := c.peers.NickOf(from)
+		fmt.Fprintf(c.out, "%s (%s): %s\n", nickOrIP(nick, from), from, string(msg.Payload))
 	case domain.MsgIgnore:
 		if ip := parseIPPayload(msg.Payload); ip != nil {
 			c.peers.SetIgnored(ip, true)
@@ -243,6 +258,13 @@ func parseIPPayload(payload []byte) net.IP {
 		return nil
 	}
 	return net.IP(payload).To4()
+}
+
+func nickOrIP(nick string, ip net.IP) string {
+	if nick != "" {
+		return nick
+	}
+	return ip.String()
 }
 
 func (c *Chat) sendHello() error {

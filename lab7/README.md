@@ -32,39 +32,27 @@ make build-all    # linux/darwin/windows amd64+arm64
 
 Для сдачи на Linux-машинах собирайте **на каждой целевой ОС** с установленным OpenMPI (`make build`). Кросс-бинарники без CGO стартуют с сообщением, что MPI недоступен (нужен OpenMPI + CGO на Unix).
 
-## Запуск
+## Запуск (только make)
 
-Локально (3 процесса на одной машине — для отладки):
+Всё показывается через `make`. Параметры по умолчанию: `N=2560`, `panel=64`, `np=3`.
 
-```bash
-make run-blocking
-make run-nonblocking
-# или:
-mpirun -np 3 ./bin/lab7 -mode blocking -n 2560 -panel 64
-mpirun -np 3 ./bin/lab7 -mode nonblocking -n 2560 -panel 64
-```
+| Команда | Когда |
+|---------|--------|
+| `make demo` | Репетиция на **1 ПК** (оба режима подряд) |
+| `make defend` | **Сдача на 3 ПК** (оба режима через hostfile) |
+| `make blocking` / `make nonblocking` | Один режим локально |
+| `make blocking-cluster` / `make nonblocking-cluster` | Один режим на кластере |
+| `make questions` | Ответы на контрольные вопросы |
+| `make help` | Список целей |
 
-На 3 компьютерах:
-
-1. Скопируйте `bin/lab7` на все хосты (одинаковый путь).
-2. Заполните `hostfile` по образцу [`hostfile.example`](hostfile.example).
-3. Запустите:
+Если прогон слишком короткий (~10–50 с нужно):
 
 ```bash
-mpirun -np 3 --hostfile hostfile ./bin/lab7 -mode blocking -n 2560 -panel 64
-mpirun -np 3 --hostfile hostfile ./bin/lab7 -mode nonblocking -n 2560 -panel 64
+make demo N=3072
+make defend N=3072
 ```
 
-Параметры:
-
-| Флаг | По умолчанию | Описание |
-|------|--------------|----------|
-| `-n` | 2560 | размер матрицы `N` (подберите так, чтобы прогон занимал ~10–50 с) |
-| `-panel` | 64 | ширина панели `B` в столбцах |
-| `-mode` | `blocking` | `blocking` или `nonblocking` |
-
-На rank 0 печатается: режим, число процессов `P`, `N`, panel, wall-time (`MPI_Wtime`), checksum `C` (должен совпадать в обоих режимах).
-
+На rank 0 печатается: режим, `P`, `N`, panel, wall-time (`MPI_Wtime`), checksum `C` (должен совпадать в обоих режимах).
 ## Алгоритм
 
 1. Rank 0 генерирует `A` и `B`, раздаёт строки `A` парными `Send`/`Recv`.
@@ -76,11 +64,48 @@ mpirun -np 3 --hostfile hostfile ./bin/lab7 -mode nonblocking -n 2560 -panel 64
 
 ## Сценарий сдачи
 
-1. Собрать на всех машинах (или NFS), подготовить `hostfile` с ≥3 хостами.
-2. Запустить blocking и nonblocking с одинаковыми `-n` / `-panel`.
-3. Сравнить времена: nonblocking должен быть заметно быстрее на реальной сети.
-4. Убедиться, что `checksum` совпадает.
-5. Ответить на контрольные вопросы (ниже).
+**Сколько машин:** **минимум 3 физических ПК**. Два — мало. Один ПК — только репетиция (`make demo`).
+
+### Подготовка (на каждом из 3 ПК)
+
+```bash
+# Go + OpenMPI, затем:
+cd lab7
+make build          # одинаковый путь к bin/lab7 на всех хостах
+```
+
+SSH без пароля с машины-запускателя на два остальных. OpenMPI стартует процессы по SSH.
+
+### Показ преподавателю (make)
+
+```bash
+# 1) один раз записать три хоста
+make hostfile HOSTS=192.168.1.10,192.168.1.11,192.168.1.12
+
+# 2) оба режима подряд (blocking → nonblocking)
+make defend
+
+# 3) ответы на вопросы
+make questions
+```
+
+Репетиция дома на одном ПК:
+
+```bash
+make demo
+```
+
+Сравнить на экране: `P=3`, **одинаковый checksum**, **nonblocking быстрее**. Если время < ~10 с — `make defend N=3072`.
+
+### Чеклист
+
+| Что | Ожидание |
+|-----|----------|
+| ПК | ≥ 3 |
+| Команда | `make defend` |
+| Checksum | совпадает |
+| Время | nonblocking быстрее |
+| Вопросы | `make questions` |
 
 ## Архитектура
 
